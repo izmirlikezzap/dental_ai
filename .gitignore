@@ -1,0 +1,113 @@
+# Model ağırlıkları ve checkpoint'ler
+*.pt
+*.pth
+*.onnx
+*.tflite
+*.pb
+*.h5
+*.keras
+*.weights
+*.safetensors
+best.pt
+last.pt
+
+# Eğitim sonuçları ve çıktılar
+yolo_detection_results/
+yolo_detection_results_v2/
+yolo_detection_results_v3/
+yolo_detection_v3_results/
+runs/
+weights/
+output/
+results/
+logs/
+experiments/
+
+# Excel ve sonuç dosyaları
+*.xlsx
+*.xls
+*.csv
+augmented_results*.xlsx
+normal_results*.xlsx
+
+# Log dosyaları
+*.log
+train.log
+*.log.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+env/
+ENV/
+.venv
+
+# IDE ve editörler
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Utility ve geçici dosyalar
+utility/
+temp/
+tmp/
+cache/
+.cache/
+
+# Backup dosyaları
+*_backup.py
+*.bak
+*.backup
+
+# Dataset'ler (gerekirse)
+data/
+datasets/
+images/
+annotations/
+
+# Tensorboard
+events.out.tfevents.*
+
+# WandB
+wandb/
+
+# MLflow
+mlruns/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+Thumbs.db
+.DS_Store
