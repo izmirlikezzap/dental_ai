@@ -77,14 +77,14 @@ IMAGE_SIZE = 1024
 
 # Batch sizes optimized for RTX A5000 (24GB VRAM) with 1024x1024 images
 BATCH_SIZE_MAP = {
-    "n": 32,  # Nano models - small, can handle larger batches
-    "s": 24,  # Small models
-    "m": 16,  # Medium models
-    "b": 12,  # Balanced models (YOLOv10)
-    "l": 10,  # Large models
-    "x": 8,   # Extra large models
-    "c": 12,  # Compact models (YOLOv9c)
-    "e": 8,   # Efficient models (YOLOv9e)
+    "n": 48,  # Nano models - aggressive start, OOM retry will reduce by 4
+    "s": 32,  # Small models
+    "m": 24,  # Medium models
+    "b": 16,  # Balanced models (YOLOv10)
+    "l": 12,  # Large models
+    "x": 10,  # Extra large models
+    "c": 20,  # Compact models (YOLOv9c)
+    "e": 10,  # Efficient models (YOLOv9e)
 }
 
 # Required memory for each model size (GB)
@@ -510,12 +510,12 @@ class Scheduler:
             record["status"] = "OOM"
 
             # Check retry limit
-            if job.retry_count < 2:
+            if job.retry_count < 4:
                 # Reduce batch size and retry
-                new_batch_size = max(2, job.batch_size - 4)
+                new_batch_size = max(2, job.batch_size - 8)
                 self.logger.warning(
                     f"[JOB OOM] {job.get_job_id()} on GPU {gpu_id} "
-                    f"(Retry {job.retry_count + 1}/2, reducing batch size {job.batch_size} -> {new_batch_size})"
+                    f"(Retry {job.retry_count + 1}/4, reducing batch size {job.batch_size} -> {new_batch_size})"
                 )
 
                 # Log OOM retry to CSV

@@ -385,12 +385,12 @@ class Trainer:
         start_time = time.time()
 
         # Custom early stopping callback
-        # Enforce minimum 100 epochs, then apply patience=20
+        # Enforce minimum 50 epochs, then apply patience=20
         class CustomEarlyStopping:
             def __init__(self):
                 self.best_fitness = -float('inf')
                 self.best_epoch = 0
-                self.patience_counter = 0  # Count epochs without improvement AFTER epoch 100
+                self.patience_counter = 0
 
             def __call__(self, trainer):
                 epoch = trainer.epoch
@@ -408,18 +408,16 @@ class Trainer:
                     self.best_fitness = current_fitness
                     self.best_epoch = epoch
 
-                    # Reset patience counter if improvement happens at or after epoch 100
-                    if epoch >= 100:
+                    if epoch >= 50:
                         self.patience_counter = 0
-                elif epoch >= 100:
-                    # No improvement after epoch 100
+                elif epoch >= 50:
                     self.patience_counter += 1
 
-                # Apply early stopping only after epoch 100
-                if epoch >= 100 and self.patience_counter >= 20:
+                # Apply early stopping only after epoch 50
+                if epoch >= 50 and self.patience_counter >= 20:
                     trainer.stopper.possible_stop = True
                     trainer.stopper.stop = True
-                    print(f"\n[CUSTOM EARLY STOP] No improvement for 20 epochs after epoch 100")
+                    print(f"\n[CUSTOM EARLY STOP] No improvement for 20 epochs after epoch 50")
                     print(f"  Best epoch: {self.best_epoch} (fitness: {self.best_fitness:.4f})")
                     print(f"  Stopped at epoch: {epoch}")
 
@@ -439,7 +437,7 @@ class Trainer:
 
         print(f"\n[TRAIN START] {self.config.model_name} | {self.config.loss_method} | "
               f"Fold {fold} | Device: {self.device} | Batch: {self.config.batch_size}")
-        print(f"[EARLY STOPPING] Minimum 100 epochs, then patience=20")
+        print(f"[EARLY STOPPING] Minimum 50 epochs, then patience=20")
 
         results = model.train(**train_args)
 
