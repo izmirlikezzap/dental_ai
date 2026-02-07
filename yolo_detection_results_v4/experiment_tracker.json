@@ -1,0 +1,88 @@
+{
+  "experiments": [
+    {
+      "id": "yolov5n_default_normal_20260207_170114",
+      "name": "yolov5n with default loss (normal)",
+      "timestamp": "20260207_170114",
+      "model": "yolov5n",
+      "loss_method": "default",
+      "is_augmented": false,
+      "dataset_version": "v3",
+      "n_folds": 5,
+      "config": {
+        "experiment_id": "yolov5n_default_normal_20260207_170114",
+        "experiment_name": "yolov5n with default loss (normal)",
+        "timestamp": "20260207_170114",
+        "model_name": "yolov5n",
+        "model_size": "n",
+        "pretrained_weights": "yolov5n.pt",
+        "dataset_version": "v3",
+        "is_augmented": false,
+        "augmentation_types": [],
+        "num_classes": 3,
+        "class_names": [
+          "healthy",
+          "meziodens",
+          "supernumere"
+        ],
+        "loss_method": "default",
+        "loss_params": {},
+        "epochs": 500,
+        "batch_size": 32,
+        "image_size": 1024,
+        "learning_rate": 0.001,
+        "patience": 20,
+        "n_folds": 5,
+        "current_fold": null,
+        "device": "0",
+        "results_dir": "/home/eva/PycharmProjects/dentalAI/yolo_detection_results_v4/normal/default_loss/runs",
+        "weights_dir": "/home/eva/PycharmProjects/dentalAI/yolo_detection_results_v4_models/normal/default_loss/weights"
+      }
+    },
+    {
+      "id": "yolov5n_weighted_normal_20260207_170114",
+      "name": "yolov5n with weighted loss (normal)",
+      "timestamp": "20260207_170114",
+      "model": "yolov5n",
+      "loss_method": "weighted",
+      "is_augmented": false,
+      "dataset_version": "v3",
+      "n_folds": 5,
+      "config": {
+        "experiment_id": "yolov5n_weighted_normal_20260207_170114",
+        "experiment_name": "yolov5n with weighted loss (normal)",
+        "timestamp": "20260207_170114",
+        "model_name": "yolov5n",
+        "model_size": "n",
+        "pretrained_weights": "yolov5n.pt",
+        "dataset_version": "v3",
+        "is_augmented": false,
+        "augmentation_types": [],
+        "num_classes": 3,
+        "class_names": [
+          "healthy",
+          "meziodens",
+          "supernumere"
+        ],
+        "loss_method": "weighted",
+        "loss_params": {
+          "class_weights": [
+            1.0,
+            2.0,
+            2.0
+          ]
+        },
+        "epochs": 500,
+        "batch_size": 32,
+        "image_size": 1024,
+        "learning_rate": 0.001,
+        "patience": 20,
+        "n_folds": 5,
+        "current_fold": null,
+        "device": "0",
+        "results_dir": "/home/eva/PycharmProjects/dentalAI/yolo_detection_results_v4/normal/weighted_loss/runs",
+        "weights_dir": "/home/eva/PycharmProjects/dentalAI/yolo_detection_results_v4_models/normal/weighted_loss/weights"
+      }
+    }
+  ]
+}

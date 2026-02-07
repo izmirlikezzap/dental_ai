@@ -1,0 +1,44 @@
+{
+  "yolov5n_default_normal_20260207_150740": {
+    "folds": {
+      "fold_0": {
+        "fold": 0,
+        "run_name": "yolov5n_default_fold0_20260207_150740",
+        "training_time_seconds": 59.40303158760071,
+        "best_weights": "/home/eva/PycharmProjects/dentalAI/yolo_detection_results_quick_test_models/normal/default_loss/weights/yolov5n_default_fold0_20260207_150740_best.pt",
+        "metrics": {
+          "mAP50": 0.35731,
+          "mAP50-95": 0.21912,
+          "precision": 0.19616,
+          "recall": 0.4375,
+          "fitness": 0.21912
+        }
+      }
+    },
+    "avg_metrics": {
+      "fold": 0.0,
+      "training_time_seconds": 59.40303158760071
+    }
+  },
+  "yolov5n_focal_normal_20260207_150839": {
+    "folds": {
+      "fold_0": {
+        "fold": 0,
+        "run_name": "yolov5n_focal_fold0_20260207_150839",
+        "training_time_seconds": 51.19900441169739,
+        "best_weights": "/home/eva/PycharmProjects/dentalAI/yolo_detection_results_quick_test_models/normal/focal_loss/weights/yolov5n_focal_fold0_20260207_150839_best.pt",
+        "metrics": {
+          "mAP50": 0.37589,
+          "mAP50-95": 0.23612,
+          "precision": 0.53125,
+          "recall": 0.24306,
+          "fitness": 0.23612
+        }
+      }
+    },
+    "avg_metrics": {
+      "fold": 0.0,
+      "training_time_seconds": 51.19900441169739
+    }
+  }
+}

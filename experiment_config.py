@@ -111,6 +111,13 @@ class ExperimentManager:
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
+        # Models directory (for weights storage, separate from results)
+        # Place it alongside the base_dir with "_models" suffix
+        base_parent = self.base_dir.parent
+        base_name = self.base_dir.name
+        self.models_dir = base_parent / f"{base_name}_models"
+        self.models_dir.mkdir(parents=True, exist_ok=True)
+
         # Master tracking files
         self.master_results_file = self.base_dir / "master_results.json"
         self.experiment_tracker_file = self.base_dir / "experiment_tracker.json"
@@ -139,10 +146,13 @@ class ExperimentManager:
         aug_dir = "augmented" if is_augmented else "normal"
         loss_name = LOSS_CONFIGS[loss_method]['name']
 
-        # Create directory hierarchy
+        # Create directory hierarchy for results
         exp_base = self.base_dir / aug_dir / loss_name
         runs_dir = exp_base / "runs"
-        weights_dir = exp_base / "weights"
+
+        # Create directory hierarchy for weights (in separate models directory)
+        models_base = self.models_dir / aug_dir / loss_name
+        weights_dir = models_base / "weights"
 
         runs_dir.mkdir(parents=True, exist_ok=True)
         weights_dir.mkdir(parents=True, exist_ok=True)
