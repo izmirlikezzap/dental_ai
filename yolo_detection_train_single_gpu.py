@@ -48,7 +48,7 @@ DATASET = {
 
 # Import project modules
 from experiment_config import ExperimentManager, create_experiment_config
-from custom_losses import get_loss_function
+from custom_losses import get_detection_loss
 
 # -----------------------------------------------------------------------------
 # DATASET UTILS
@@ -100,9 +100,6 @@ class Trainer:
         self.config.results_dir = str(self.paths["runs_dir"])
         self.config.weights_dir = str(self.paths["weights_dir"])
 
-        # Get loss function (metadata only, not directly injected)
-        _ = get_loss_function(self.config.loss_method, self.config.loss_params)
-
     def prepare_data_yaml(self, train_images: List[str], val_images: List[str], fold: int) -> Path:
         fold_dir = self.paths["runs_dir"] / f"fold_{fold}"
         fold_dir.mkdir(parents=True, exist_ok=True)
@@ -126,27 +123,6 @@ class Trainer:
             yaml.safe_dump(data_yaml, f)
 
         return yaml_path
-
-    def _parse_per_class_metrics(self, run_dir: Path) -> Dict:
-        """
-        Parse per-class metrics from validation output
-        Looks for per-class AP in training logs
-
-        Returns:
-            Dictionary with per-class AP50 and AP values
-        """
-        per_class = {}
-
-        # Try to find validation output in the run directory
-        # YOLO prints per-class metrics during final validation
-        # Format: "meziodens    28    36    0.455    0.556    0.593    0.337"
-        # Columns: class, images, instances, P, R, mAP50, mAP50-95
-
-        # Since we don't have the validation output saved separately,
-        # we'll leave this empty and rely on aggregate metrics
-        # Per-class metrics can be added later if needed
-
-        return per_class
 
     def _parse_class_metrics_from_log(self, run_name: str) -> Dict[str, Dict[str, float]]:
         """
@@ -261,8 +237,6 @@ class Trainer:
             "recall": 0.0,
             "fitness": 0.0,
             "f1_score": 0.0,
-            "dice_coefficient": 0.0,
-            "iou_score": 0.0,
             # Best epoch info
             "best_epoch": 0,
             "training_time_at_best": 0.0,
@@ -309,19 +283,6 @@ class Trainer:
             else:
                 f1_score = 0.0
 
-            # Calculate Dice coefficient (similar to F1, but for segmentation-style metrics)
-            # Dice = 2 * TP / (2*TP + FP + FN) = 2*precision*recall / (precision + recall) = F1
-            dice_coefficient = f1_score
-
-            # Approximate IoU from precision and recall
-            # IoU = TP / (TP + FP + FN)
-            # Using Jaccard index approximation from precision and recall
-            if precision + recall > 0:
-                # IoU ≈ (precision * recall) / (precision + recall - precision * recall)
-                iou_score = (precision * recall) / (precision + recall - precision * recall + 1e-7)
-            else:
-                iou_score = 0.0
-
             metrics = {
                 # Core detection metrics
                 "mAP50": float(best_row.get('metrics/mAP50(B)', 0)),
@@ -330,8 +291,6 @@ class Trainer:
                 "recall": recall,
                 "fitness": float(best_row.get('metrics/mAP50-95(B)', 0)),
                 "f1_score": f1_score,
-                "dice_coefficient": dice_coefficient,
-                "iou_score": iou_score,
                 # Best epoch info
                 "best_epoch": int(float(best_row.get('epoch', 0))),
                 "training_time_at_best": float(best_row.get('time', 0)),
@@ -398,44 +357,13 @@ class Trainer:
             "verbose": True,
         }
 
-        # Loss-specific parameters
-        # Note: Ultralytics YOLO v8+ doesn't directly support focal loss via arguments
-        # We'll use different loss weights to simulate different loss methods
-        if self.config.loss_method == 'focal':
-            # Focal Loss simulation: Increase cls weight to focus on hard examples
-            train_args.update({
-                "box": 7.5,
-                "cls": 1.0,  # Increased from 0.5 for focal-like behavior
-                "dfl": 1.5,
-            })
-            print(f"[LOSS] Using Focal-like Loss (cls=1.0, increased weight for hard examples)")
-
-        elif self.config.loss_method == 'diou':
-            # DIoU Loss: Use default (YOLO v8+ uses CIoU by default which includes DIoU)
-            train_args.update({
-                "box": 10.0,  # Increase box weight for better localization
-                "cls": 0.5,
-                "dfl": 1.5,
-            })
-            print(f"[LOSS] Using DIoU-focused Loss (box=10.0)")
-
-        elif self.config.loss_method == 'weighted':
-            # Weighted Loss: Increase classification loss weight for imbalanced classes
-            train_args.update({
-                "box": 7.5,
-                "cls": 2.0,  # Increase cls weight for imbalanced classes
-                "dfl": 1.5,
-            })
-            print(f"[LOSS] Using Weighted Loss (cls=2.0 for class imbalance)")
-
-        else:  # default
-            # Default YOLO loss
-            train_args.update({
-                "box": 7.5,
-                "cls": 0.5,
-                "dfl": 1.5,
-            })
-            print(f"[LOSS] Using Default YOLO Loss (box=7.5, cls=0.5, dfl=1.5)")
+        # Fixed loss weights for all methods (actual loss logic is injected via criterion)
+        train_args.update({
+            "box": 7.5,
+            "cls": 0.5,
+            "dfl": 1.5,
+        })
+        print(f"[LOSS] Using {self.config.loss_method} loss (injected via on_train_start callback)")
 
         if self.config.is_augmented:
             train_args.update({
@@ -497,6 +425,17 @@ class Trainer:
 
         early_stopper = CustomEarlyStopping()
         model.add_callback("on_fit_epoch_end", early_stopper)
+
+        # Inject custom loss into model.criterion via on_train_start callback
+        loss_method = self.config.loss_method
+        loss_params = self.config.loss_params
+
+        def inject_loss(trainer):
+            criterion = get_detection_loss(loss_method, trainer.model, loss_params)
+            trainer.model.criterion = criterion
+            print(f"[LOSS] Injected {loss_method} loss into model.criterion")
+
+        model.add_callback("on_train_start", inject_loss)
 
         print(f"\n[TRAIN START] {self.config.model_name} | {self.config.loss_method} | "
               f"Fold {fold} | Device: {self.device} | Batch: {self.config.batch_size}")

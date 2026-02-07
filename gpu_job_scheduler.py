@@ -303,11 +303,6 @@ class Scheduler:
         except Exception as e:
             self.logger.error(f"Failed to write to CSV {csv_file}: {e}")
 
-    def log_with_tqdm(self, message: str, level: str = "INFO"):
-        """Log message to file only, without interfering with tqdm progress bar"""
-        # Only log to file, not to console (to avoid breaking progress bar)
-        pass
-
     def _is_fold_completed(self, model_name: str, loss_method: str,
                           is_augmented: bool, fold: int) -> bool:
         """

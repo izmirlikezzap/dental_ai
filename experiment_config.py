@@ -41,7 +41,7 @@ LOSS_CONFIGS = {
         'name': 'weighted_loss',
         'description': 'Class-weighted loss for imbalanced classes',
         'params': {
-            'class_weights': [1.0, 2.0, 2.0]  # [healthy, meziodens, supernumere]
+            'class_weights': [1.0, 2.5]  # [meziodens, supernumere] ratio: 200/79 ≈ 2.53
         }
     }
 }
@@ -194,8 +194,13 @@ class ExperimentManager:
         return "_".join(parts)
 
     def register_experiment(self, config: ExperimentConfig):
-        """Register a new experiment in the tracker"""
+        """Register a new experiment in the tracker (skips duplicates)"""
         tracker = self._load_json(self.experiment_tracker_file)
+
+        # Skip if already registered
+        existing_ids = {e['id'] for e in tracker.get('experiments', [])}
+        if config.experiment_id in existing_ids:
+            return
 
         experiment_entry = {
             'id': config.experiment_id,
@@ -246,7 +251,9 @@ class ExperimentManager:
         metrics_count = {}
 
         for fold_results in folds_data.values():
-            for metric, value in fold_results.items():
+            # fold_results may contain a nested 'metrics' dict
+            metrics_dict = fold_results.get('metrics', fold_results) if isinstance(fold_results, dict) else {}
+            for metric, value in metrics_dict.items():
                 if isinstance(value, (int, float)):
                     if metric not in metrics_sum:
                         metrics_sum[metric] = 0
@@ -480,9 +487,9 @@ def create_experiment_config(
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # Generate experiment ID
+    # Generate experiment ID (deterministic so all folds share the same ID)
     aug_str = "aug" if is_augmented else "normal"
-    experiment_id = f"{model_name}_{loss_method}_{aug_str}_{timestamp}"
+    experiment_id = f"{model_name}_{loss_method}_{aug_str}"
 
     # Experiment name
     experiment_name = f"{model_name} with {loss_method} loss ({aug_str})"
@@ -500,8 +507,8 @@ def create_experiment_config(
     # Get loss parameters
     loss_config = LOSS_CONFIGS[loss_method]
 
-    # Class names (from your dataset)
-    class_names = ['healthy', 'meziodens', 'supernumere']
+    # Class names (from your dataset - 2 classes, no 'healthy')
+    class_names = ['meziodens', 'supernumere']
 
     return ExperimentConfig(
         experiment_id=experiment_id,
