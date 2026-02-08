@@ -2,29 +2,28 @@
 """
 Custom Loss Functions for YOLO Detection
 
-Proper v8DetectionLoss subclasses that inject into the YOLO training pipeline.
-Implements: Focal Loss (BCE replacement), DIoU Loss (BboxLoss replacement),
-            Weighted Loss (per-class BCE weights).
+In-place component swaps on the model's existing criterion.
+Works with any detection head (v8Detect, v10Detect, YOLO26, etc.)
+by modifying .bce or .bbox_loss attributes rather than replacing
+the entire criterion class.
 """
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from ultralytics.utils.loss import v8DetectionLoss, BboxLoss
+from ultralytics.utils.loss import BboxLoss
 from ultralytics.utils.metrics import bbox_iou
 from ultralytics.utils.tal import bbox2dist
 
 
 # ---------------------------------------------------------------------------
-# Focal Loss (replaces nn.BCEWithLogitsLoss inside v8DetectionLoss)
+# Focal Loss (replaces .bce inside any DetectionLoss)
 # ---------------------------------------------------------------------------
 
 class FocalBCEWithLogitsLoss(nn.Module):
     """
     Drop-in replacement for nn.BCEWithLogitsLoss(reduction='none')
     that applies focal weighting: (1 - p_t)^gamma * BCE.
-
-    Reference: https://arxiv.org/abs/1708.02002
     """
 
     def __init__(self, alpha: float = 0.25, gamma: float = 2.0):
@@ -45,16 +44,8 @@ class FocalBCEWithLogitsLoss(nn.Module):
         return focal_weight * bce
 
 
-class FocalDetectionLoss(v8DetectionLoss):
-    """v8DetectionLoss with BCE replaced by Focal BCE."""
-
-    def __init__(self, model, alpha: float = 0.25, gamma: float = 2.0):
-        super().__init__(model)
-        self.bce = FocalBCEWithLogitsLoss(alpha=alpha, gamma=gamma)
-
-
 # ---------------------------------------------------------------------------
-# DIoU Loss (replaces BboxLoss inside v8DetectionLoss)
+# DIoU Loss (replaces .bbox_loss inside any DetectionLoss)
 # ---------------------------------------------------------------------------
 
 class DIoUBboxLoss(BboxLoss):
@@ -101,17 +92,8 @@ class DIoUBboxLoss(BboxLoss):
         return loss_iou, loss_dfl
 
 
-class DIoUDetectionLoss(v8DetectionLoss):
-    """v8DetectionLoss with BboxLoss replaced by DIoU variant."""
-
-    def __init__(self, model):
-        super().__init__(model)
-        m = model.model[-1]
-        self.bbox_loss = DIoUBboxLoss(m.reg_max).to(self.device)
-
-
 # ---------------------------------------------------------------------------
-# Weighted Loss (per-class weights applied to BCE)
+# Weighted Loss (per-class weights applied to .bce)
 # ---------------------------------------------------------------------------
 
 class WeightedBCEWithLogitsLoss(nn.Module):
@@ -128,54 +110,61 @@ class WeightedBCEWithLogitsLoss(nn.Module):
 
     def forward(self, inputs: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         bce = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
-        # class_weights shape: (C,) → broadcast over (B, C) or (N, C)
         weights = self.class_weights.to(inputs.device)
         if inputs.dim() >= 2 and inputs.shape[-1] == weights.shape[0]:
             bce = bce * weights
         return bce
 
 
-class WeightedDetectionLoss(v8DetectionLoss):
-    """v8DetectionLoss with BCE replaced by per-class weighted BCE."""
-
-    def __init__(self, model, class_weights: list[float] | None = None):
-        super().__init__(model)
-        self.bce = WeightedBCEWithLogitsLoss(class_weights=class_weights)
-
-
 # ---------------------------------------------------------------------------
-# Factory
+# In-place injection (modifies existing criterion, doesn't replace it)
 # ---------------------------------------------------------------------------
 
-def get_detection_loss(loss_method: str, model, loss_params: dict | None = None):
+def inject_custom_loss(criterion, loss_method: str, loss_params: dict | None = None):
     """
-    Create a v8DetectionLoss (or subclass) for the given method.
+    Modify the model's existing criterion in-place by swapping components.
+
+    This works with ANY detection loss class (v8DetectionLoss, v10DetectionLoss,
+    YOLO26 loss, etc.) as long as it has .bce and/or .bbox_loss attributes.
 
     Args:
+        criterion: The model's existing criterion (trainer.model.criterion)
         loss_method: 'default', 'focal', 'diou', 'weighted'
-        model:       The YOLO model (needed by v8DetectionLoss.__init__)
-        loss_params: Extra parameters forwarded to the loss constructor
-
-    Returns:
-        A v8DetectionLoss instance ready to assign to model.criterion
+        loss_params: Extra parameters for the loss
     """
     if loss_params is None:
         loss_params = {}
 
     if loss_method == "default":
-        return v8DetectionLoss(model)
+        print(f"[LOSS] Using model's native loss (no modification)")
+        return
 
     elif loss_method == "focal":
-        alpha = loss_params.get("alpha", 0.25)
-        gamma = loss_params.get("gamma", 2.0)
-        return FocalDetectionLoss(model, alpha=alpha, gamma=gamma)
+        if hasattr(criterion, "bce"):
+            alpha = loss_params.get("alpha", 0.25)
+            gamma = loss_params.get("gamma", 2.0)
+            criterion.bce = FocalBCEWithLogitsLoss(alpha=alpha, gamma=gamma)
+            print(f"[LOSS] Swapped criterion.bce → FocalBCE (alpha={alpha}, gamma={gamma})")
+        else:
+            print(f"[LOSS WARNING] criterion has no 'bce' attribute, skipping focal injection")
 
     elif loss_method == "diou":
-        return DIoUDetectionLoss(model)
+        if hasattr(criterion, "bbox_loss"):
+            old_bbox = criterion.bbox_loss
+            reg_max = old_bbox.dfl_loss.reg_max if old_bbox.dfl_loss else 16
+            device = next(old_bbox.parameters()).device if list(old_bbox.parameters()) else "cpu"
+            criterion.bbox_loss = DIoUBboxLoss(reg_max).to(device)
+            print(f"[LOSS] Swapped criterion.bbox_loss → DIoUBboxLoss")
+        else:
+            print(f"[LOSS WARNING] criterion has no 'bbox_loss' attribute, skipping DIoU injection")
 
     elif loss_method == "weighted":
-        class_weights = loss_params.get("class_weights", [1.0, 2.0])
-        return WeightedDetectionLoss(model, class_weights=class_weights)
+        if hasattr(criterion, "bce"):
+            class_weights = loss_params.get("class_weights", [1.0, 2.5])
+            criterion.bce = WeightedBCEWithLogitsLoss(class_weights=class_weights)
+            print(f"[LOSS] Swapped criterion.bce → WeightedBCE (weights={class_weights})")
+        else:
+            print(f"[LOSS WARNING] criterion has no 'bce' attribute, skipping weighted injection")
 
     else:
         raise ValueError(f"Unknown loss method: {loss_method}")

@@ -48,7 +48,7 @@ DATASET = {
 
 # Import project modules
 from experiment_config import ExperimentManager, create_experiment_config
-from custom_losses import get_detection_loss
+from custom_losses import inject_custom_loss
 
 # -----------------------------------------------------------------------------
 # DATASET UTILS
@@ -424,14 +424,12 @@ class Trainer:
         early_stopper = CustomEarlyStopping()
         model.add_callback("on_fit_epoch_end", early_stopper)
 
-        # Inject custom loss into model.criterion via on_train_start callback
+        # Inject custom loss components into model's existing criterion
         loss_method = self.config.loss_method
         loss_params = self.config.loss_params
 
         def inject_loss(trainer):
-            criterion = get_detection_loss(loss_method, trainer.model, loss_params)
-            trainer.model.criterion = criterion
-            print(f"[LOSS] Injected {loss_method} loss into model.criterion")
+            inject_custom_loss(trainer.model.criterion, loss_method, loss_params)
 
         model.add_callback("on_train_start", inject_loss)
 

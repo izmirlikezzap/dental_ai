@@ -83,7 +83,7 @@ BATCH_SIZE_MAP = {
     "b": 16,  # Balanced models (YOLOv10)
     "l": 12,  # Large models
     "x": 10,  # Extra large models
-    "c": 20,  # Compact models (YOLOv9c)
+    "c": 12,  # Compact models (YOLOv9c) - 20 OOMs on A5000
     "e": 10,  # Efficient models (YOLOv9e)
 }
 
