@@ -425,13 +425,23 @@ class Trainer:
         model.add_callback("on_fit_epoch_end", early_stopper)
 
         # Inject custom loss components into model's existing criterion
+        # Use on_train_epoch_start (first epoch only) because criterion
+        # may not exist yet at on_train_start time
         loss_method = self.config.loss_method
         loss_params = self.config.loss_params
+        _loss_injected = [False]
 
         def inject_loss(trainer):
-            inject_custom_loss(trainer.model.criterion, loss_method, loss_params)
+            if _loss_injected[0]:
+                return
+            criterion = getattr(trainer.model, 'criterion', None) or getattr(trainer, 'criterion', None)
+            if criterion is not None:
+                inject_custom_loss(criterion, loss_method, loss_params)
+                _loss_injected[0] = True
+            else:
+                print(f"[LOSS WARNING] No criterion found on model or trainer")
 
-        model.add_callback("on_train_start", inject_loss)
+        model.add_callback("on_train_epoch_start", inject_loss)
 
         print(f"\n[TRAIN START] {self.config.model_name} | {self.config.loss_method} | "
               f"Fold {fold} | Device: {self.device} | Batch: {self.config.batch_size}")
