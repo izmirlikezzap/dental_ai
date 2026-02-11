@@ -41,32 +41,32 @@ RESULTS_ROOT = Path("/home/eva/PycharmProjects/dentalAI/yolo_detection_results_v
 LOG_DIR = RESULTS_ROOT / "scheduler_logs"
 JOB_LOG_DIR = LOG_DIR / "job_logs"
 
-# Model configurations - Only nano versions (fastest, smallest)
+# Model configurations - All sizes
 MODELS = [
     # YOLOv5
     ("yolov5n", "n"),
-    # ("yolov5s", "s"), ("yolov5m", "m"), ("yolov5l", "l"), ("yolov5x", "x"),
+    ("yolov5s", "s"), ("yolov5m", "m"), ("yolov5l", "l"), ("yolov5x", "x"),
 
     # YOLOv8
     ("yolov8n", "n"),
-    # ("yolov8s", "s"), ("yolov8m", "m"), ("yolov8l", "l"), ("yolov8x", "x"),
+    ("yolov8s", "s"), ("yolov8m", "m"), ("yolov8l", "l"), ("yolov8x", "x"),
 
-    # YOLOv9 - keeping 'c' (compact, closest to nano)
+    # YOLOv9
     ("yolov9c", "c"),
-    # ("yolov9e", "e"),
+    ("yolov9e", "e"),
 
     # YOLOv10
     ("yolov10n", "n"),
-    # ("yolov10s", "s"), ("yolov10m", "m"), ("yolov10b", "b"),
-    # ("yolov10l", "l"), ("yolov10x", "x"),
+    ("yolov10s", "s"), ("yolov10m", "m"), ("yolov10b", "b"),
+    ("yolov10l", "l"), ("yolov10x", "x"),
 
     # YOLOv11
     ("yolo11n", "n"),
-    # ("yolo11s", "s"), ("yolo11m", "m"), ("yolo11l", "l"), ("yolo11x", "x"),
+    ("yolo11s", "s"), ("yolo11m", "m"), ("yolo11l", "l"), ("yolo11x", "x"),
 
     # YOLO26
     ("yolo26n", "n"),
-    # ("yolo26s", "s"), ("yolo26m", "m"), ("yolo26l", "l"), ("yolo26x", "x"),
+    ("yolo26s", "s"), ("yolo26m", "m"), ("yolo26l", "l"), ("yolo26x", "x"),
 ]
 
 LOSS_METHODS = ["default", "focal", "diou", "weighted"]
