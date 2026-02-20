@@ -396,12 +396,23 @@ class Scheduler:
         self.logger.info(f"Job queue built: {total_jobs} jobs pending, {skipped_jobs} jobs skipped")
         return job_queue
 
-    def download_pretrained_weights(self, job_queue: PriorityQueue):
+    def _validate_pt_file(self, pt_file: str) -> bool:
+        """Check if a .pt file is valid by attempting to load it with torch."""
+        try:
+            import torch
+            torch.load(pt_file, map_location="cpu", weights_only=False)
+            return True
+        except Exception:
+            return False
+
+    def download_pretrained_weights(self, job_queue: PriorityQueue, redownload: bool = False):
         """Pre-download all required .pt files to avoid race conditions.
 
         When multiple GPUs try to download the same .pt file simultaneously,
         one process may read a partially downloaded/corrupt file, causing
         SIGABRT (exit code -6) from torch.load().
+
+        Also validates existing .pt files and re-downloads corrupt ones.
         """
         unique_models = set()
         for job in job_queue.queue:
@@ -410,16 +421,29 @@ class Scheduler:
         if not unique_models:
             return
 
-        self.logger.info(f"Pre-downloading {len(unique_models)} model weight files...")
+        self.logger.info(f"Checking {len(unique_models)} model weight files...")
         for pt_file in sorted(unique_models):
-            if Path(pt_file).exists():
-                self.logger.info(f"  {pt_file} already exists, skipping")
-                continue
+            pt_path = Path(pt_file)
+            if pt_path.exists() and not redownload:
+                # Validate existing file
+                if self._validate_pt_file(pt_file):
+                    self.logger.info(f"  {pt_file} OK")
+                    continue
+                else:
+                    self.logger.warning(f"  {pt_file} is CORRUPT, deleting and re-downloading...")
+                    pt_path.unlink()
+            elif pt_path.exists() and redownload:
+                self.logger.info(f"  {pt_file} exists, --redownload set, deleting...")
+                pt_path.unlink()
+
             self.logger.info(f"  Downloading {pt_file}...")
             try:
                 from ultralytics import YOLO
-                YOLO(pt_file)  # triggers download if not present
-                self.logger.info(f"  Downloaded {pt_file}")
+                YOLO(pt_file)  # triggers download
+                if self._validate_pt_file(pt_file):
+                    self.logger.info(f"  Downloaded and verified {pt_file}")
+                else:
+                    self.logger.error(f"  Downloaded {pt_file} but validation failed!")
             except Exception as e:
                 self.logger.error(f"  Failed to download {pt_file}: {e}")
 
@@ -794,6 +818,8 @@ Examples:
                        help='Comma-separated list of GPU IDs to use (default: 0,1)')
     parser.add_argument('--dry-run', action='store_true',
                        help='Build job queue and show plan without executing')
+    parser.add_argument('--redownload', action='store_true',
+                       help='Delete and re-download all pretrained .pt weight files')
 
     args = parser.parse_args()
 
@@ -837,7 +863,7 @@ Examples:
 
     # Pre-download pretrained weights to avoid race conditions between GPUs
     if not args.dry_run:
-        scheduler.download_pretrained_weights(job_queue)
+        scheduler.download_pretrained_weights(job_queue, redownload=args.redownload)
 
     if args.dry_run:
         logger.info("\n" + "=" * 90)
