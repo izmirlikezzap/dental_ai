@@ -396,6 +396,33 @@ class Scheduler:
         self.logger.info(f"Job queue built: {total_jobs} jobs pending, {skipped_jobs} jobs skipped")
         return job_queue
 
+    def download_pretrained_weights(self, job_queue: PriorityQueue):
+        """Pre-download all required .pt files to avoid race conditions.
+
+        When multiple GPUs try to download the same .pt file simultaneously,
+        one process may read a partially downloaded/corrupt file, causing
+        SIGABRT (exit code -6) from torch.load().
+        """
+        unique_models = set()
+        for job in job_queue.queue:
+            unique_models.add(f"{job.model_name}.pt")
+
+        if not unique_models:
+            return
+
+        self.logger.info(f"Pre-downloading {len(unique_models)} model weight files...")
+        for pt_file in sorted(unique_models):
+            if Path(pt_file).exists():
+                self.logger.info(f"  {pt_file} already exists, skipping")
+                continue
+            self.logger.info(f"  Downloading {pt_file}...")
+            try:
+                from ultralytics import YOLO
+                YOLO(pt_file)  # triggers download if not present
+                self.logger.info(f"  Downloaded {pt_file}")
+            except Exception as e:
+                self.logger.error(f"  Failed to download {pt_file}: {e}")
+
     def launch_job(self, job: Job, gpu_id: int) -> bool:
         """Launch training subprocess on specified GPU"""
         if gpu_id in self.active_jobs:
@@ -807,6 +834,10 @@ Examples:
 
     # Build job queue
     job_queue = scheduler.build_job_queue()
+
+    # Pre-download pretrained weights to avoid race conditions between GPUs
+    if not args.dry_run:
+        scheduler.download_pretrained_weights(job_queue)
 
     if args.dry_run:
         logger.info("\n" + "=" * 90)
