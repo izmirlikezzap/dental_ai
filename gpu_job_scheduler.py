@@ -396,6 +396,14 @@ class Scheduler:
         self.logger.info(f"Job queue built: {total_jobs} jobs pending, {skipped_jobs} jobs skipped")
         return job_queue
 
+    def _is_oom_from_log(self, log_file: Path) -> bool:
+        """Check if a job log file contains OOM error messages."""
+        try:
+            content = log_file.read_text(errors='ignore').lower()
+            return "out of memory" in content or "cuda out of memory" in content
+        except Exception:
+            return False
+
     def _validate_pt_file(self, pt_file: str) -> bool:
         """Check if a .pt file is valid by attempting to load it with torch."""
         try:
@@ -556,8 +564,9 @@ class Scheduler:
                 f"(Duration: {duration/60:.1f}min, Status: SUCCESS)"
             )
 
-        elif returncode == 2:
-            # OOM error (exit code 2 from training script)
+        elif returncode == 2 or self._is_oom_from_log(job_info['log_file']):
+            # OOM error: exit code 2 from training script, or SIGABRT (-6)
+            # caused by CUDA C++ runtime aborting after OOM
             record["status"] = "OOM"
 
             # Check retry limit
